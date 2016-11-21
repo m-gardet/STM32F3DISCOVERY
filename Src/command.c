@@ -18,6 +18,8 @@
 #include "flash.h"
 #include "iwdg.h"
 
+#define VERSION "1.0.0"
+
 #define END_OF_LINE "\n\r"
 
 #define OS_WAITE_TIMEOUT 1000 // in ms
@@ -253,9 +255,10 @@ int help(uint8_t* cmd,uint8_t len)
   UNUSED(len);
   usb_printf("\n\r");
   usb_printf("----------------------help----------------------\n\r");
+  usb_printf("APP VERSION %s\n\r",VERSION);
   usb_printf("HELP (this message)\n\r");
   usb_printf("--------------system configuration--------------\n\r");
-  usb_printf("%s (%d)\n\r",SET_SYS_NAME_NAME,SET_SYS_NAME_LEN+sizeof(config.sys_name));
+  usb_printf("%s XXXXXX (len max %d) \n\r",SET_SYS_NAME_NAME,SET_SYS_NAME_LEN+sizeof(config.sys_name));
   usb_printf("%s (%d)\n\r",GET_SYS_NAME_NAME,GET_SYS_NAME_LEN);
   usb_printf("%s (%d)\n\r",GET_UID_NAME,GET_UID_NAME_LEN);
   usb_printf("%s (%d)\n\r",SAVE_CONFIG_NAME,SAVE_CONFIG_NAME_LEN);
@@ -873,7 +876,7 @@ cmd_st cmd_list[] =
   { GPIO_SET_TOTAL_LEN , GPIO_SET_NAME_LEN ,  GPIO_SET_NAME , cmd_set  },
   { GPIO_GET_TOTAL_LEN , GPIO_GET_NAME_LEN ,  GPIO_GET_NAME , cmd_get  },
 
-  // end if list
+  // end of list
   {0 ,0,"", NULL }
 };
 
