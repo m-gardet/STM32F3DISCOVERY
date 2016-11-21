@@ -835,7 +835,7 @@ int cmd_set_sys_nanme(uint8_t* cmd,uint8_t len)
     l = sizeof(config.sys_name) -1;
 
   memcpy(config.sys_name,arg,l);
-  config.sys_name[l+1] = '\0';
+  config.sys_name[l] = '\0';
   usb_printf(CMD_OK "\n\r");
   return 0;
 }
