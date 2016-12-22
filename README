@@ -1,0 +1,30 @@
+
+
+#buid (or eclipse)
+scripts/build.sh
+
+#prog (Todo)
+
+# setting for udev
+
+/etc/udev/rules.d/99-stlinkv2.rules
+
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="3748", MODE:="0666", SYMLINK+="stlinkv2_%n"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", MODE:="0666"
+
+# reload udev
+sudo udevadm control --reload-rules
+
+# it may also be necessary to disable ModemManager
+systemctl disable ModemManager
+
+#now connect to usb user input (uart config 115200 8N1)
+
+minicom -D /dev/ttyACM0
+
+#enable "echo" ( CTRL-A => Z => E )
+#command list :
+
+HELP + enter
+
+
