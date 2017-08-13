@@ -90,9 +90,16 @@ void MX_FREERTOS_Init(void)
 /* StartDefaultTask function */
 void StartDefaultTask(void const * argument)
 {
+  uint32_t previousWakeTime ;
+  previousWakeTime = osKernelSysTick();
+  osDelayUntil (&previousWakeTime, 30);
   /* init code for USB_DEVICE */
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN StartDefaultTask */
+
+  previousWakeTime = osKernelSysTick();
+  osDelayUntil (&previousWakeTime, 350);
+
   /* Infinite loop */
   cmd_loop();
   /* USER CODE END StartDefaultTask */

@@ -17,8 +17,9 @@
 #include "stm32f3xx_hal_gpio.h"
 #include "flash.h"
 #include "iwdg.h"
+#include "adc.h"
 
-#define VERSION "1.0.0"
+#define VERSION "1.0.1"
 
 #define END_OF_LINE "\n\r"
 
@@ -35,7 +36,6 @@ const char RESERVED_PIN[][5] =
   "PC15",// OSC32_OUT     RCC_OSC32_OUT OSC32_OUT
   "PF00",// OSC_IN        RCC_OSC_IN    OSC_IN
   "PF01",// OSC_OUT       RCC_OSC_OUT   OSC_OUT
-  "PF02",// ADC1_IN10     ADC
   "PA00",// GPIO_Input      B1        [Blue PushButton]
   "PA04",// DAC_OUT1      DAC
   "PA05",// SPI1_SCK      SPI1_SCK    [L3GD20_SCL/SPC]
@@ -43,7 +43,9 @@ const char RESERVED_PIN[][5] =
   "PA07",// SPI1_MOSI     SPI1_MISO     [L3GD20_SDA/SDI/SDO]
   /*
   "PE08",// GPIO_Output     LD4       [Blue Led]
+  */
   "PE09",// GPIO_Output     LD3       [Red Led]
+  /*
   "PE10",// GPIO_Output     LD5       [Orange Led]
   "PE11",// GPIO_Output     LD7       [Green Led]
   "PE12",// GPIO_Output     LD9       [Blue Led]
@@ -60,8 +62,29 @@ const char RESERVED_PIN[][5] =
   "PB07",// I2C1_SDA      I2C1_SDA [LSM303DLHC_SDA]
   "PE00",// GPIO_EXTI0      MEMS_INT1 [L3GD20_INT1]
   "PE01",// GPIO_EXTI1      MEMS_INT2 [L3GD20_DRDY/INT2]
+  // end
   "\0"
 };
+
+typedef struct
+{
+  const uint8_t name[5];
+  uint32_t channel;
+} adc_st;
+
+
+adc_st adc_chanel [6] =
+{
+  { "PC00" , ADC_CHANNEL_6  },
+  { "PC01" , ADC_CHANNEL_7  },
+  { "PC02" , ADC_CHANNEL_8  },
+  { "PC03" , ADC_CHANNEL_9  },
+  { "PF02" , ADC_CHANNEL_10 },
+  // end
+  { "\0"  , 0 }
+
+};
+
 
 typedef struct
 {
@@ -71,14 +94,18 @@ typedef struct
   uint8_t state;
 } gpio_st;
 
+
+#define NUMBER_OF_GPIO 64
+#define INTEGRITY_NAME "ZZZZ"
 typedef struct
 {
   char sys_name[50];
-  gpio_st gpio[64];
+  gpio_st gpio[NUMBER_OF_GPIO];
+  char integrity_name[5];
 } config_st;
 
 
-config_st config =
+const config_st default_config =
 {
   {
     "IO Demo"
@@ -109,7 +136,6 @@ config_st config =
     //{ "PB06" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET }, LSM303DLHC_SCL
     //{ "PB07" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET }, LSM303DLHC_SDA
 
-    // PE8 - PE15 => LED
     { "PB08" , GPIO_MODE_OUTPUT_PP , GPIO_NOPULL , GPIO_PIN_RESET },
     { "PB09" , GPIO_MODE_OUTPUT_PP , GPIO_NOPULL , GPIO_PIN_RESET },
     { "PB10" , GPIO_MODE_OUTPUT_PP , GPIO_NOPULL , GPIO_PIN_RESET },
@@ -162,10 +188,11 @@ config_st config =
     //{ "PE04" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET }, LSM303DLHC_INT1
     //{ "PE05" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET }, LSM303DLHC_INT2
 
+    // PE8 - PE15 => LED
     { "PE06" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET },
     { "PE07" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET },
     { "PE08" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET },
-    { "PE09" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET },
+    //{ "PE09" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET },
     { "PE10" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET },
     { "PE11" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET },
     { "PE12" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET },
@@ -174,15 +201,18 @@ config_st config =
     { "PE15" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET },
     //{ "PF00" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET }, //OSC_IN
     //{ "PF01" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET }, //OSC_OUT
-    //{ "PF02" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET }, ADC1_IN10
+    { "PF02" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET },
     { "PF04" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET },
     { "PF06" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET },
     { "PF09" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET },
     { "PF10" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET },
-
-    { "\0" , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET },
-  }
+    // end
+    { "\0"   , GPIO_MODE_INPUT , GPIO_NOPULL , GPIO_PIN_RESET }
+  },
+  {INTEGRITY_NAME}
 };
+
+config_st config;
 
 
 #define CMD_OK "*OK* "
@@ -208,6 +238,9 @@ config_st config =
 #define DUMP_CONFIG_NAME "CONFIG DUMP"
 #define DUMP_CONFIG_NAME_LEN (sizeof(DUMP_CONFIG_NAME)-1)
 
+#define DEFAULT_CONFIG_NAME "CONFIG DEFAULT"
+#define DEFAULT_CONFIG_NAME_LEN (sizeof(DEFAULT_CONFIG_NAME)-1)
+
 #define GPIO_INIT_NAME "INIT"
 #define GPIO_INIT_NAME_LEN (sizeof(GPIO_INIT_NAME)-1)
 
@@ -217,6 +250,7 @@ config_st config =
 #define MODE_INPUT        "INP"
 #define MODE_OUTPUT_PP    "OPP"
 #define MODE_OUTPUT_OD    "OOD"
+#define MODE_INPUT_ADC    "ADC"
 
 #define GPIO_PULL_LEN  2
 #define NOPULL        "NO"
@@ -263,6 +297,7 @@ int help(uint8_t* cmd,uint8_t len)
   usb_printf("%s (%d)\n\r",GET_UID_NAME,GET_UID_NAME_LEN);
   usb_printf("%s (%d)\n\r",SAVE_CONFIG_NAME,SAVE_CONFIG_NAME_LEN);
   usb_printf("%s (%d)\n\r",DUMP_CONFIG_NAME,DUMP_CONFIG_NAME_LEN);
+  usb_printf("%s (%d)\n\r",DEFAULT_CONFIG_NAME,DEFAULT_CONFIG_NAME_LEN);
   usb_printf("---------------gpio configuration---------------\n\r");
   usb_printf("gpio configuration\n\r");
   usb_printf("%s NAME MODE PULL\n\r",GPIO_INIT_NAME);
@@ -270,6 +305,7 @@ int help(uint8_t* cmd,uint8_t len)
   usb_printf("        PC13, PA00, PB15, ...\n\r");
   usb_printf("  MODE (%d bytes) \n\r",GPIO_MODE_LEN);
   usb_printf("        %s   (Input Floating)\n\r",MODE_INPUT);
+  usb_printf("        %s   (Input ADC PC00 PC01 PC02 PC03 PF02)\n\r",MODE_INPUT_ADC);
   usb_printf("        %s   (Output Push Pull Mode)\n\r",MODE_OUTPUT_PP);
   usb_printf("        %s   (Output Open Drain Mode)\n\r",MODE_OUTPUT_OD);
   usb_printf("  PULL (%d bytes) \n\r",GPIO_PULL_LEN);
@@ -519,6 +555,11 @@ int get_mode(uint8_t modeTxt[GPIO_MODE_LEN],uint32_t *mode)
     *mode = GPIO_MODE_OUTPUT_OD;
     return 0;
   }
+  else if(strncmp((const char *)modeTxt,MODE_INPUT_ADC,GPIO_MODE_LEN) == 0)
+  {
+    *mode = GPIO_MODE_ANALOG;
+    return 0;
+  }
 
   usb_printf(CMD_KO "unknown mode : %s\n\r",modeTxt);
   return -1;
@@ -582,6 +623,23 @@ int get_config_index(const uint8_t name[4])
   return -1;
 }
 
+uint32_t get_adc_channel(const uint8_t name[4])
+{
+  uint16_t i=0;
+
+  while(adc_chanel[i].name[0] != '\0')
+  {
+    if(strncmp((const char *)&adc_chanel[i].name[0],(const char *)name,4) == 0)
+    {
+      return adc_chanel[i].channel;
+    }
+
+    i++;
+  }
+
+  return 0;
+}
+
 int update_config_value(const uint8_t name[4],uint8_t state)
 {
   int index = get_config_index(name);
@@ -616,6 +674,9 @@ const char *get_mode_txt(uint32_t mode)
   {
     case GPIO_MODE_INPUT:
       return MODE_INPUT;
+
+    case GPIO_MODE_ANALOG:
+      return MODE_INPUT_ADC;
 
     case GPIO_MODE_OUTPUT_PP:
       return MODE_OUTPUT_PP;
@@ -686,9 +747,15 @@ int load_config()
   uint16_t i=0;
   config_st *config_flash  = (config_st *)CONFIGUATION_ADDRESS;
 
-  if(config_flash->sys_name[0] != 0xFF)
+  if(config_flash->sys_name[0] != 0xFF && memcmp(&config_flash->integrity_name[0], &default_config.integrity_name[0], sizeof(default_config.integrity_name)) == 0)
   {
+    usb_printf("use flash config\n\r");
     memcpy(&config,(void*)config_flash,sizeof(config));
+  }
+  else
+  {
+    usb_printf("use default config\n\r");
+    memcpy(&config,&default_config,sizeof(config));
   }
 
   GPIO_TypeDef *port=0;
@@ -719,9 +786,10 @@ int cmd_save_config(uint8_t* cmd,uint8_t len)
 {
   UNUSED(cmd);
   UNUSED(len);
+
   if(memcmp((void*)CONFIGUATION_ADDRESS,(void*)&config,sizeof(config)) == 0)
   {
-    usb_printf(CMD_OK "is uptodate \n\r");
+    usb_printf(CMD_OK "is uptodate\n\r");
     return 0;
   }
 
@@ -735,6 +803,11 @@ int cmd_save_config(uint8_t* cmd,uint8_t len)
   return 0;
 }
 
+int cmd_default_config(uint8_t* cmd,uint8_t len)
+{
+  memcpy(&config,&default_config,sizeof(config));
+  return cmd_save_config(cmd,len);
+}
 
 int cmd_init(uint8_t* cmd,uint8_t  len)
 {
@@ -813,7 +886,6 @@ int cmd_get(uint8_t* cmd,uint8_t  len)
 {
   UNUSED(len);
   uint8_t* arg= cmd;
-  uint32_t value;
   arg+= (GPIO_GET_NAME_LEN+1);
   GPIO_TypeDef *GPIOx=0;
   uint32_t pin=0;
@@ -821,8 +893,40 @@ int cmd_get(uint8_t* cmd,uint8_t  len)
   if(get_port_and_pin(arg,&GPIOx,&pin) !=0)
     return -1;
 
-  value = gpio_read_pin(GPIOx, pin);
-  usb_printf(CMD_OK "value :%d\n\r",value);
+  int index = get_config_index(arg);
+
+  if(index < 0)
+  {
+    usb_printf(CMD_KO " configuration index not found for cmd %s\n\r",cmd);
+    return -1;
+  }
+
+  if(config.gpio[index].mode == GPIO_MODE_ANALOG)
+  {
+    uint32_t channel = get_adc_channel(arg);
+
+    if(channel == 0)
+    {
+      usb_printf(CMD_KO " adc channel not found for cmd %s\n\r",cmd);
+      return -1;
+    }
+
+    int32_t value = adc_read(channel);
+
+    if(value < 0)
+    {
+      usb_printf(CMD_KO " adc read error %s\n\r",cmd);
+      return -1;
+    }
+
+    usb_printf(CMD_OK "value :%d\n\r",value);
+  }
+  else
+  {
+    uint32_t value = gpio_read_pin(GPIOx, pin);
+    usb_printf(CMD_OK "value :%d\n\r",value);
+  }
+
   return 0;
 }
 
@@ -869,8 +973,9 @@ cmd_st cmd_list[] =
   { UNKNOWN_TOTAL_LEN   , SET_SYS_NAME_LEN ,  SET_SYS_NAME_NAME , cmd_set_sys_nanme  },
   { GET_SYS_NAME_LEN    , GET_SYS_NAME_LEN ,  GET_SYS_NAME_NAME , cmd_get_sys_nanme  },
 
-  { SAVE_CONFIG_NAME_LEN, SAVE_CONFIG_NAME_LEN,   SAVE_CONFIG_NAME,   cmd_save_config },
-  { DUMP_CONFIG_NAME_LEN, DUMP_CONFIG_NAME_LEN,   DUMP_CONFIG_NAME,   cmd_dump_config },
+  { SAVE_CONFIG_NAME_LEN   , SAVE_CONFIG_NAME_LEN   , SAVE_CONFIG_NAME   , cmd_save_config },
+  { DUMP_CONFIG_NAME_LEN   , DUMP_CONFIG_NAME_LEN   , DUMP_CONFIG_NAME   , cmd_dump_config },
+  { DEFAULT_CONFIG_NAME_LEN, DEFAULT_CONFIG_NAME_LEN, DEFAULT_CONFIG_NAME, cmd_default_config },
 
   { GPIO_INIT_TOTAL_LEN, GPIO_INIT_NAME_LEN,  GPIO_INIT_NAME, cmd_init },
   { GPIO_SET_TOTAL_LEN , GPIO_SET_NAME_LEN ,  GPIO_SET_NAME , cmd_set  },

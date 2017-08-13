@@ -24,3 +24,5 @@ Makefile.in
 /m4
 
 /build-stm32
+
+/Debug

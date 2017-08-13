@@ -56,7 +56,7 @@ extern void Error_Handler(void);
 void MX_ADC1_Init(void);
 
 /* USER CODE BEGIN Prototypes */
-
+int32_t adc_read(uint32_t channel);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus
