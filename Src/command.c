@@ -858,6 +858,20 @@ int cmd_set(uint8_t* cmd,uint8_t len)
   if(get_port_and_pin(arg,&GPIOx,&pin) !=0)
     return -1;
 
+  int index = get_config_index(arg);
+
+  if(index < 0)
+  {
+    usb_printf(CMD_KO " configuration index not found for cmd %s\n\r",cmd);
+    return -1;
+  }
+
+  if(config.gpio[index].mode != GPIO_MODE_OUTPUT_PP && config.gpio[index].mode != GPIO_MODE_OUTPUT_OD)
+  {
+    usb_printf(CMD_KO " this pin is not an ouput %s => cmd %s\n\r", get_mode_txt(config.gpio[index].mode), cmd);
+    return -1;
+  }
+
   arg+= (GPIO_NAME_LEN+1);
   uint32_t value =0;
 
